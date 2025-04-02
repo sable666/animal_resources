@@ -148,10 +148,10 @@
             display: none;
         }
 
+
         .floating-btn {
             position: fixed;
-            top: 100px;
-            /* Move it slightly lower to avoid being covered */
+            top: 160px;
             left: 20px;
             background: #849e88;
             color: white;
@@ -163,8 +163,8 @@
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
             transition: 0.3s;
             z-index: 1000;
-            /* Ensures it's on top of everything */
         }
+
 
 
         .floating-btn:hover {
@@ -235,6 +235,29 @@
                 transform: rotate(360deg);
             }
         }
+
+
+        .offcanvas-content .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: auto;
+            height: auto;
+            padding: 0;
+            background: none;
+            border: none;
+            font-size: 20px;
+            font-weight: bold;
+            color: #849e88;
+            cursor: pointer;
+            z-index: 1;
+        }
+
+
+        .offcanvas-content .close-btn:hover {
+            color: #dbe0db;
+            transform: scale(1.1);
+        }
     </style>
 
 
@@ -260,8 +283,9 @@
     <!-- Off-Canvas Prompt -->
     <div id="offCanvasPrompt" class="offcanvas-backdrop">
         <div class="offcanvas-content">
-            <button class="close-btn" onclick="toggleOffCanvasPrompt()">✖</button>
+            <button class="close-btn" onclick="toggleOffCanvasPrompt()" aria-label="Close menu">×</button>
             <h2>Welcome to the Animal Resource Map</h2>
+
             <p>Enter a location or use your current location to find nearby animal services.</p>
 
             <input type="text" id="userLocationInput" placeholder="Enter a city or ZIP code">
@@ -299,24 +323,48 @@
     <script>
         //close prompt
         function toggleOffCanvasPrompt() {
-            let menu = document.getElementById("offCanvasPrompt");
+            const menu = document.getElementById("offCanvasPrompt");
+            const loadingScreen = document.getElementById("loadingOverlay");
+
             menu.classList.toggle("hidden");
+
+            // If no search was made yet, load clinic data by default
+            if (!hasSearched) {
+                loadingScreen.style.display = "flex";
+
+                // Default to showing all clinics nationwide from GeoJSON
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        displayClinicsFromGeoJSON(lat, lon);
+                    },
+                    (error) => {
+                        // If user denies location or it fails, center on US
+                        console.warn("Geolocation failed, loading clinics anyway.");
+                        map.setView([39.8283, -98.5795], 5); // Default US view
+                        displayClinicsFromGeoJSON(39.8283, -98.5795);
+                    }
+                );
+            }
         }
+
+        let hasSearched = false;
+
 
 
 
         let map = L.map('map').setView([39.8283, -98.5795], 4);
+        map.zoomControl.setPosition('bottomleft');
         let accessToken = '';
         const CLIENT_ID = "FgiLCjS6JcJdXlGSKCWBgPqzFOMW7GtmbCtRhvPGAEeVR6rcZJ";
         const CLIENT_SECRET = "FUbgFZUveMyK3U8rS5cJcYCXlE74x5MHMiIionWC";
 
-        var Stadia_AlidadeSmoothDark = L.tileLayer(
-            'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.{ext}', {
-                minZoom: 0,
-                maxZoom: 20,
-                attribution: '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                ext: 'png'
-            }).addTo(map);
+        var OpenStreetMap_HOT = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style by <a href="https://www.hotosm.org/" target="_blank">Humanitarian OpenStreetMap Team</a> hosted by <a href="https://openstreetmap.fr/" target="_blank">OpenStreetMap France</a>'
+}).addTo(map);
+
 
 
         async function getAccessToken() {
@@ -378,7 +426,7 @@
                         let clinicLat = latlng.lat;
                         let clinicLon = latlng.lng;
                         let distance = map.distance([userLat, userLon], [clinicLat, clinicLon]) /
-                        1000; // Convert meters to km
+                            1000; // Convert meters to km
 
                         if (distance <= 100) { // Filter clinics within 100km
                             count++;
@@ -423,6 +471,7 @@
         let searchCircle = null;
 
         async function searchShelters() {
+            hasSearched = true;
             let location = document.getElementById('userLocationInput').value.trim();
             let selectedService = document.getElementById("serviceType").value;
             let loadingScreen = document.getElementById("loadingOverlay");
